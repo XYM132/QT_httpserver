@@ -9,16 +9,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     tcp_sever = new QTcpServer(this);
 
-    if(tcp_sever->listen(QHostAddress::Any,8080) == false)
-    {
-        qDebug() << "listen false";
-        this->close();
-    }
-    connect(tcp_sever,SIGNAL(newConnection()),this,SLOT(new_connect()));
+    file_info = new QFileInfo();
 
     time = new QTimer(this);
     time->setSingleShot(true);
     connect(time,SIGNAL(timeout()),this,SLOT(connect_timeout()));
+
+    ui->pushButton_listen->click();
 
 }
 
@@ -29,7 +26,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::readyread()
 {
-    if(tcp_socket->bytesAvailable() > 0)
+    while(tcp_socket->bytesAvailable() > 0)
     {
         QByteArray buf = tcp_socket->readAll();
         http_head = new http_parse(QString(buf));
@@ -38,6 +35,7 @@ void MainWindow::readyread()
         QString Content_Type = "text/html;charset=utf-8";
         QString additon = ""; //用于在http请求头中添加选项
         int status = 200;
+
         if(http_head->path == "/")
         {
             QFile html(QDir::currentPath() + "/../http_server/html/index.html");
@@ -49,7 +47,7 @@ void MainWindow::readyread()
         }
         else if(http_head->path == "/data")
         {
-            ui->textBrowser->append(http_head->http_content+"\r\n\r\n");
+            append_data_show(ui->textBrowser_recive,http_head->http_content+"\r\n\r\n","#000");
             status = 200;
         }
         else if(http_head->path == "/file")
@@ -63,16 +61,33 @@ void MainWindow::readyread()
         }
         else if(http_head->path == "/getFile")
         {
-            additon += QString("Location: /getFile/opencv-4.3.0.tar.gz\r\n");
+            if(file_info->fileName() == "")
+            {
+                additon += QString("Location: /\r\n");
+            }
+            else
+            {
+                additon += QString("Location: /getFile/%1\r\n").arg(file_info->fileName());
+            }
             status = 302;
         }
-        else if(http_head->path == "/getFile/"+filename)
+        else if(http_head->path == "/getFile/"+file_info->fileName())
         {
-            QFile html(QDir::currentPath() + "/../http_server/opencv-4.3.0.tar.gz");
-            html.open(QIODevice::ReadOnly);
-            response = html.readAll();
+            QFile file(file_info->filePath());
+            file.open(QIODevice::ReadOnly);
+            response = file.readAll();
             Content_Type = "application/octet-stream";
-            html.close();
+            file.close();
+            status = 200;
+        }
+        else if(http_head->path == "/sendData")
+        {
+            if(send_str != "")
+            {
+                response = send_str.toUtf8();
+                send_str = "";
+            }
+
             status = 200;
         }
         else if(http_head->path == "/favicon.ico")
@@ -82,7 +97,7 @@ void MainWindow::readyread()
         else
         {
             qDebug() << http_head->path;
-            ui->textBrowser->append(http_head->path + "  404\r\n");
+            append_data_show(ui->textBrowser_info,QString(http_head->path) + "  404\r\n","#e00","\r\n");
             status = 404;
         }
 
@@ -111,7 +126,11 @@ void MainWindow::getFile()
         if(webkit->boundary == "")
         {
             webkit = new WebKitFormBoundary_parse(QString(buf));
+
             buf = buf.mid(webkit->head_size);
+            if(webkit->chunk == "0")
+                append_data_show(ui->textBrowser_info,QString("reciving: ") + webkit->name + "...","#aac");
+            ui->progressBar->setValue((webkit->chunk.toInt() + 1) * 100 / webkit->chunks.toInt());
         }
 
         part_data.append(buf);
@@ -125,12 +144,15 @@ void MainWindow::getFile()
             {
                 response = QString("{result:\'ok\',id:10001,url:\'\'}");
 
-                QFile* target = new QFile("./file/" + webkit->name);
+                QDir dir(ui->lineEdit_dir->text());
+                QFile* target = new QFile(dir.absolutePath() + "/" + webkit->name);
                 target->open(QIODevice::WriteOnly|QIODevice::Truncate);
                 target->write(file_data);
                 target->close();
 
                 file_data.clear();
+                ui->progressBar->reset();
+                append_data_show(ui->textBrowser_recive,QString("recivefile:") + webkit->name,"#090");
             }
             else {
 
@@ -174,3 +196,67 @@ void MainWindow::connect_timeout()
     tcp_socket->close();
 }
 
+
+void MainWindow::on_pushButton_dir_clicked()
+{
+    QString dir_name = QFileDialog::getExistingDirectory(
+                this,
+                tr("Open Directory"),
+                "./");
+    if(dir_name.size() != 0)
+        ui->lineEdit_dir->setText(dir_name);
+
+}
+
+void MainWindow::on_pushButton_file_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(
+                this,
+                tr("Open file"),
+                "./");
+    if(filename.size() != 0)
+    {
+        ui->lineEdit_file->setText(filename);
+        file_info = new QFileInfo(filename);
+    }
+}
+
+void MainWindow::on_pushButton_listen_clicked()
+{
+    if(ui->pushButton_listen->text() == "监听")
+    {
+        int port = ui->spinBox_port->value();
+        if(tcp_sever->listen(QHostAddress::Any,port) == true)
+        {
+            connect(tcp_sever,SIGNAL(newConnection()),this,SLOT(new_connect()));
+            ui->pushButton_listen->setText("停止监听");
+        }
+    }
+    else {
+        tcp_sever->close();
+        ui->pushButton_listen->setText("监听");
+    }
+}
+
+void MainWindow::on_pushButton_opendir_clicked()
+{
+    QDir dir(ui->lineEdit_dir->text());
+    QDesktopServices::openUrl(QUrl(dir.absolutePath(), QUrl::TolerantMode));
+}
+
+void MainWindow::append_data_show(QTextBrowser* tb, QString text,QString color,QString end/* = \r\n\r\n*/)
+{
+    QTime current_time =QTime::currentTime();
+    QString time = current_time.toString("hh:mm:ss");
+    tb->append(QString("<font color='%1'>[%2] %3</font>%4").arg(color).arg(time).arg(text).arg(end));
+}
+
+void MainWindow::on_pushButton_clear_clicked()
+{
+    ui->textEdit_send->clear();
+}
+
+void MainWindow::on_pushButton_send_clicked()
+{
+    send_str = ui->textEdit_send->toPlainText();
+}
