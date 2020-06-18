@@ -38,12 +38,25 @@ void MainWindow::readyread()
 
         if(http_head->path == "/")
         {
-            QFile html(QDir::currentPath() + "/../http_server/html/index.html");
-            html.open(QIODevice::ReadOnly);
-            response = html.readAll();
-            html.close();
+            QString path = ui->lineEdit_dir_html->text();
+            QFileInfo htmlPath;
+            if(path.indexOf(".") == 0)
+                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
+            else
+                htmlPath = QFileInfo(path);
 
-            status = 200;
+            QFile html(htmlPath.absoluteFilePath() + "/index.html");
+            if(html.open(QIODevice::ReadOnly))
+            {
+                response = html.readAll();
+                html.close();
+
+                status = 200;
+            }
+            else {
+                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + "/index.html" + "文件，请在源文件路径中选择正确的路径","#f00");
+                status = 404;
+            }
         }
         else if(http_head->path == "/data")
         {
@@ -89,6 +102,32 @@ void MainWindow::readyread()
             }
 
             status = 200;
+        }
+        else if(http_head->path.indexOf("/js_css") == 0)
+        {
+            QString path = ui->lineEdit_dir_html->text();
+            QFileInfo htmlPath;
+            if(path.indexOf(".") == 0)
+                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
+            else
+                htmlPath = QFileInfo(path);
+
+            QFile html(htmlPath.absoluteFilePath() + http_head->path.mid(7));
+            if(http_head->path.mid(7).indexOf("js") != -1)
+                Content_Type = "application/javascript; charset=utf-8";
+            else
+                Content_Type = "text/css";
+            if(html.open(QIODevice::ReadOnly))
+            {
+                response = html.readAll();
+                html.close();
+
+                status = 200;
+            }
+            else {
+                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
+                status = 404;
+            }
         }
         else if(http_head->path == "/favicon.ico")
         {
@@ -145,6 +184,8 @@ void MainWindow::getFile()
                 response = QString("{result:\'ok\',id:10001,url:\'\'}");
 
                 QDir dir(ui->lineEdit_dir->text());
+                if(!dir.exists())
+                    dir.mkpath(".");
                 QFile* target = new QFile(dir.absolutePath() + "/" + webkit->name);
                 target->open(QIODevice::WriteOnly|QIODevice::Truncate);
                 target->write(file_data);
@@ -184,8 +225,8 @@ void MainWindow::new_connect()
 {
     while (tcp_sever->hasPendingConnections())
     {
-        if(tcp_socket != nullptr)
-            tcp_socket->close();
+//        if(tcp_socket != nullptr)
+//            tcp_socket->close();
         tcp_socket = tcp_sever->nextPendingConnection();
         connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
     }
@@ -229,6 +270,15 @@ void MainWindow::on_pushButton_listen_clicked()
         if(tcp_sever->listen(QHostAddress::Any,port) == true)
         {
             connect(tcp_sever,SIGNAL(newConnection()),this,SLOT(new_connect()));
+
+
+            QList<QHostAddress> list =QNetworkInterface::allAddresses();
+            foreach (QHostAddress address, list)
+            {
+               if(address.protocol() ==QAbstractSocket::IPv4Protocol)
+                   //我们使用IPv4地址
+                   append_data_show(ui->textBrowser_info,address.toString(),"#0d4");
+            }
             ui->pushButton_listen->setText("停止监听");
         }
     }
@@ -259,4 +309,14 @@ void MainWindow::on_pushButton_clear_clicked()
 void MainWindow::on_pushButton_send_clicked()
 {
     send_str = ui->textEdit_send->toPlainText();
+}
+
+void MainWindow::on_pushButton_dir_html_clicked()
+{
+    QString dir_name = QFileDialog::getExistingDirectory(
+                this,
+                tr("Open Directory"),
+                "./");
+    if(dir_name.size() != 0)
+        ui->lineEdit_dir_html->setText(dir_name);
 }

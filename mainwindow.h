@@ -13,6 +13,8 @@
 #include <QDesktopServices>
 #include <QTextBrowser>
 #include <QTime>
+#include <QNetworkInterface>
+#include <QVector>
 
 #include "http_parse.h"
 #include "webkitformboundary_parse.h"
@@ -48,12 +50,15 @@ private slots:
 
     void on_pushButton_send_clicked();
 
+    void on_pushButton_dir_html_clicked();
+
 private:
     void append_data_show(QTextBrowser* tb,QString text,QString color,QString end = "\r\n\r\n");
 
 private:
     QTcpServer* tcp_sever;
     QTcpSocket* tcp_socket = nullptr;
+    QVector<QTcpSocket*> v_socket;
 
     QByteArray file_data;
     QByteArray part_data;
