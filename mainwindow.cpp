@@ -225,8 +225,8 @@ void MainWindow::new_connect()
 {
     while (tcp_sever->hasPendingConnections())
     {
-//        if(tcp_socket != nullptr)
-//            tcp_socket->close();
+        if(tcp_socket != nullptr)
+            tcp_socket->close();
         tcp_socket = tcp_sever->nextPendingConnection();
         connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
     }
