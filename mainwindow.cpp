@@ -26,10 +26,23 @@ MainWindow::~MainWindow()
 
 void MainWindow::readyread()
 {
+
+    int index = -1;
+    for(int i=0;i<v_socket.size();i++)
+    {
+     if(v_socket[i]->state() == QAbstractSocket::ConnectedState)
+     {
+         if(v_socket[i]->bytesAvailable() > 0)
+             index = i;
+     }
+    }
+    if(index == -1) return;
+    QTcpSocket* tcp_socket = v_socket[index];
+
     while(tcp_socket->bytesAvailable() > 0)
     {
         QByteArray buf = tcp_socket->readAll();
-        http_head = new http_parse(QString(buf));
+        http_head = new http_parse(buf);
 
         QByteArray response;
         QString Content_Type = "text/html;charset=utf-8";
@@ -70,6 +83,12 @@ void MainWindow::readyread()
 
             disconnect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
             connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(getFile()));
+            file_socket = index;
+
+            if(http_head->http_content.length() != 0)
+            {
+                file_deal(http_head->http_content);
+            }
             return;
         }
         else if(http_head->path == "/getFile")
@@ -115,7 +134,7 @@ void MainWindow::readyread()
             QFile html(htmlPath.absoluteFilePath() + http_head->path.mid(7));
             if(http_head->path.mid(7).indexOf("js") != -1)
                 Content_Type = "application/javascript; charset=utf-8";
-            else
+            else if(http_head->path.mid(7).indexOf("css") != -1)
                 Content_Type = "text/css";
             if(html.open(QIODevice::ReadOnly))
             {
@@ -129,13 +148,39 @@ void MainWindow::readyread()
                 status = 404;
             }
         }
+        else if(http_head->path == "/fonts/zenicon.woff?v=2.2.0")
+        {
+            Content_Type = "application/octet-stream";
+            QString path = ui->lineEdit_dir_html->text();
+            QFileInfo htmlPath;
+            if(path.indexOf(".") == 0)
+                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
+            else
+                htmlPath = QFileInfo(path);
+
+            QFile html(htmlPath.absoluteFilePath() + "/zenicon.woff");
+
+            if(html.open(QIODevice::ReadOnly))
+            {
+                response = html.readAll();
+                html.close();
+
+                status = 200;
+            }
+            else {
+                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
+                status = 404;
+            }
+
+
+        }
         else if(http_head->path == "/favicon.ico")
         {
             status = 404;
         }
         else
         {
-            qDebug() << http_head->path;
+            qDebug() << "path:" << http_head->path;
             append_data_show(ui->textBrowser_info,QString(http_head->path) + "  404\r\n","#e00","\r\n");
             status = 404;
         }
@@ -153,71 +198,90 @@ void MainWindow::readyread()
         tcp_socket->flush();
         tcp_socket->waitForBytesWritten(http.size() + response.size());
         tcp_socket->close();
+
+
+        v_socket.erase(v_socket.begin() + index);
+    }
+}
+
+void MainWindow::file_deal(QByteArray buf)
+{
+    QTcpSocket* tcp_socket = v_socket[file_socket];
+    qDebug() << "buf.size()" << buf.size();
+    if(webkit->boundary == "")
+    {
+        webkit = new WebKitFormBoundary_parse(QString(buf));
+
+        qDebug() << buf.mid(webkit->head_size + 100);
+        buf = buf.mid(webkit->head_size);
+        if(webkit->chunk == "0")
+            append_data_show(ui->textBrowser_info,QString("reciving: ") + webkit->name + "...","#aac");
+        ui->progressBar->setValue((webkit->chunk.toInt() + 1) * 100 / webkit->chunks.toInt());
+    }
+
+    part_data.append(buf);
+    qDebug() << this->http_head->Content_Length << webkit->head_size << part_data.size();
+    if(part_data.size() + webkit->head_size == this->http_head->Content_Length)
+    {
+        part_data = part_data.mid(0,part_data.length() - webkit->foot_size);
+        file_data.append(part_data);
+
+        QString response = "";
+        if(webkit->chunk.toInt() == webkit->chunks.toInt() -1)
+        {
+            response = QString("{result:\'ok\',id:10001,url:\'\'}");
+
+            QDir dir(ui->lineEdit_dir->text());
+            if(!dir.exists())
+                dir.mkpath(".");
+            QFile* target = new QFile(dir.absolutePath() + "/" + webkit->name);
+            target->open(QIODevice::WriteOnly|QIODevice::Truncate);
+            target->write(file_data);
+            target->close();
+
+            file_data.clear();
+            ui->progressBar->reset();
+            append_data_show(ui->textBrowser_recive,QString("recivefile:") + webkit->name,"#090");
+        }
+        else {
+
+            response = QString("{\"args\":{},\"data\":\"\",\"files\":{\"file\":\"data:application/octet-stream;base64,\"},\"form\":{\"chunk\":\"%1\",\"chunks\":\"%2\",\"name\":\"%3\",\"uuid\":\"%4\"},\"headers\":{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip,deflate,br\",\"Accept-Language\":\"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\",\"Content-Length\":\"%5\",\"Content-Type\":\"multipart/form-data;boundary=----%6\",\"Sec-Fetch-Dest\":\"empty\",\"Sec-Fetch-Mode\":\"cors\",\"Sec-Fetch-Site\":\"cross-site\",\"User-Agent\":\"Mozilla/5.0(X11;Linuxx86_64)AppleWebKit/537.36(KHTML,likeGecko)Chrome/83.0.4103.97Safari/537.36\",\"X-Amzn-Trace-Id\":\"Root=\"},\"json\":null}")\
+                    .arg(webkit->chunk).arg((webkit->chunks)).arg(webkit->name).arg(webkit->uuid).arg(part_data.size()).arg(webkit->boundary);
+        }
+
+        QString http = QString("HTTP/1.1 200 OK\r\n");
+        http += "access-control-allow-credentials: true\r\n";
+        http += "Content-Type: text/html;charset=utf-8\r\n";
+        http += "content-type: application/json\r\n";
+        http += "status: 200\r\n";
+        http +=   QString("Content-Length: %1\r\n\r\n").arg(QString::number(response.size()));
+
+        tcp_socket->write(http.toUtf8());
+        tcp_socket->write(response.toUtf8());
+        tcp_socket->flush();
+        tcp_socket->waitForBytesWritten(http.size() + response.size());
+        tcp_socket->close();
+
+        v_socket.erase(v_socket.begin() + file_socket);
+        file_socket = -1;
+
+    }
+    else
+    {
+        time->start(2000);
     }
 }
 
 void MainWindow::getFile()
 {
     time->stop();
+
+    QTcpSocket* tcp_socket = v_socket[file_socket];
     while(tcp_socket->bytesAvailable() > 0)
     {
         QByteArray buf = tcp_socket->readAll();
-        if(webkit->boundary == "")
-        {
-            webkit = new WebKitFormBoundary_parse(QString(buf));
+        file_deal(buf);
 
-            buf = buf.mid(webkit->head_size);
-            if(webkit->chunk == "0")
-                append_data_show(ui->textBrowser_info,QString("reciving: ") + webkit->name + "...","#aac");
-            ui->progressBar->setValue((webkit->chunk.toInt() + 1) * 100 / webkit->chunks.toInt());
-        }
-
-        part_data.append(buf);
-        if(part_data.size() + webkit->head_size == this->http_head->Content_Length)
-        {
-            part_data = part_data.mid(0,part_data.length() - webkit->foot_size);
-            file_data.append(part_data);
-
-            QString response = "";
-            if(webkit->chunk.toInt() == webkit->chunks.toInt() -1)
-            {
-                response = QString("{result:\'ok\',id:10001,url:\'\'}");
-
-                QDir dir(ui->lineEdit_dir->text());
-                if(!dir.exists())
-                    dir.mkpath(".");
-                QFile* target = new QFile(dir.absolutePath() + "/" + webkit->name);
-                target->open(QIODevice::WriteOnly|QIODevice::Truncate);
-                target->write(file_data);
-                target->close();
-
-                file_data.clear();
-                ui->progressBar->reset();
-                append_data_show(ui->textBrowser_recive,QString("recivefile:") + webkit->name,"#090");
-            }
-            else {
-
-                response = QString("{\"args\":{},\"data\":\"\",\"files\":{\"file\":\"data:application/octet-stream;base64,\"},\"form\":{\"chunk\":\"%1\",\"chunks\":\"%2\",\"name\":\"%3\",\"uuid\":\"%4\"},\"headers\":{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip,deflate,br\",\"Accept-Language\":\"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\",\"Content-Length\":\"%5\",\"Content-Type\":\"multipart/form-data;boundary=----%6\",\"Sec-Fetch-Dest\":\"empty\",\"Sec-Fetch-Mode\":\"cors\",\"Sec-Fetch-Site\":\"cross-site\",\"User-Agent\":\"Mozilla/5.0(X11;Linuxx86_64)AppleWebKit/537.36(KHTML,likeGecko)Chrome/83.0.4103.97Safari/537.36\",\"X-Amzn-Trace-Id\":\"Root=\"},\"json\":null}")\
-                        .arg(webkit->chunk).arg((webkit->chunks)).arg(webkit->name).arg(webkit->uuid).arg(part_data.size()).arg(webkit->boundary);
-            }
-
-            QString http = QString("HTTP/1.1 200 OK\r\n");
-            http += "access-control-allow-credentials: true\r\n";
-            http += "Content-Type: text/html;charset=utf-8\r\n";
-            http += "content-type: application/json\r\n";
-            http += "status: 200\r\n";
-            http +=   QString("Content-Length: %1\r\n\r\n").arg(QString::number(response.size()));
-
-            tcp_socket->write(http.toUtf8());
-            tcp_socket->write(response.toUtf8());
-            tcp_socket->flush();
-            tcp_socket->waitForBytesWritten(http.size() + response.size());
-            tcp_socket->close();
-        }
-        else
-        {
-            time->start(2000);
-        }
     }
 }
 
@@ -227,14 +291,19 @@ void MainWindow::new_connect()
     {
 //        if(tcp_socket != nullptr)
 //            tcp_socket->close();
-        tcp_socket = tcp_sever->nextPendingConnection();
+        QTcpSocket* tcp_socket = tcp_sever->nextPendingConnection();
         connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
+        v_socket.push_back(tcp_socket);
     }
 }
 
 void MainWindow::connect_timeout()
 {
-    tcp_socket->close();
+    qDebug() << "enter";
+    v_socket[file_socket]->close();
+    v_socket.erase(v_socket.begin() + file_socket);
+    file_socket = -1;
+    qDebug() << "quit";
 }
 
 
@@ -300,6 +369,8 @@ void MainWindow::append_data_show(QTextBrowser* tb, QString text,QString color,Q
     QString time = current_time.toString("hh:mm:ss");
     tb->append(QString("<font color='%1'>[%2] %3</font>%4").arg(color).arg(time).arg(text).arg(end));
 }
+
+
 
 void MainWindow::on_pushButton_clear_clicked()
 {

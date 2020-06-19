@@ -56,9 +56,13 @@ private:
     void append_data_show(QTextBrowser* tb,QString text,QString color,QString end = "\r\n\r\n");
 
 private:
+    void file_deal(QByteArray buf = nullptr);
+
+
     QTcpServer* tcp_sever;
-    QTcpSocket* tcp_socket = nullptr;
+    //QTcpSocket* tcp_socket = nullptr;
     QVector<QTcpSocket*> v_socket;
+    int file_socket = -1;
 
     QByteArray file_data;
     QByteArray part_data;

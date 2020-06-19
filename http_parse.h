@@ -6,12 +6,12 @@
 class http_parse
 {
 public:
-    http_parse(QString http_data);
+    http_parse(QByteArray data);
     QString type;
     QString path;
     QString version;
     QStringList http_head;
-    QString http_content;
+    QByteArray http_content;
     QString origin_str;
     QString host = "";
 
