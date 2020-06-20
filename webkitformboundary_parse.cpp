@@ -23,7 +23,7 @@ WebKitFormBoundary_parse::WebKitFormBoundary_parse(QString data)
 
     num = data.indexOf("Content-Type:");
     head_size = data.indexOf("\r\n",num) + 4;
-    head_size = data.mid(0,head_size).toLocal8Bit().length();
+    head_size = data.mid(0,head_size).toUtf8().length();
 
     foot_size = this->boundary.length() + 12;
 }
