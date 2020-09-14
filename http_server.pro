@@ -19,15 +19,25 @@ SOURCES += \
     http_parse.cpp \
     main.cpp \
     mainwindow.cpp \
-    webkitformboundary_parse.cpp
+    qrcodeshow.cpp \
+    webkitformboundary_parse.cpp \
+    multi_socket.cpp
 
 HEADERS += \
     http_parse.h \
     mainwindow.h \
-    webkitformboundary_parse.h
+    qrcodeshow.h \
+    webkitformboundary_parse.h \
+    multi_socket.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    qrcodeshow.ui
+
+
+INCLUDEPATH += "/usr/local/source/qrencode/include"
+LIBS += "/usr/local/source/qrencode/static/libqrencode.a"
+
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

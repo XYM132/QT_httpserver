@@ -15,9 +15,13 @@
 #include <QTime>
 #include <QNetworkInterface>
 #include <QVector>
+#include <QListWidget>
+#include <QMouseEvent>
 
 #include "http_parse.h"
 #include "webkitformboundary_parse.h"
+#include "multi_socket.h"
+#include "qrcodeshow.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,10 +36,10 @@ public:
     ~MainWindow();
 
 public slots:
-    void readyread();
-    void getFile();
+    //void readyread();
+    void getFile(MultiSocket* multi_socket);
     void new_connect();
-    void connect_timeout();
+    void multi_readyread(MultiSocket* multi_socket);
 
 private slots:
     void on_pushButton_dir_clicked();
@@ -52,30 +56,33 @@ private slots:
 
     void on_pushButton_dir_html_clicked();
 
-private:
-    void append_data_show(QTextBrowser* tb,QString text,QString color,QString end = "\r\n\r\n");
+    void on_listWidget_ip_itemPressed(QListWidgetItem *item);
+
+    void mouseMoveEvent(QMouseEvent *p);
 
 private:
-    void file_deal(QByteArray buf = nullptr);
+    void append_data_show(QTextBrowser* tb,QString text,QString color,QString end = "\r\n\r\n");
+    void check_v_multi_socket();
+
+private:
+    void file_deal(MultiSocket *multi_socket,QByteArray buf);
 
 
     QTcpServer* tcp_sever;
-    //QTcpSocket* tcp_socket = nullptr;
-    QVector<QTcpSocket*> v_socket;
-    int file_socket = -1;
+    QVector<MultiSocket*> v_multi_socket;
 
     QByteArray file_data;
     QByteArray part_data;
 
-    WebKitFormBoundary_parse* webkit = nullptr;
-    http_parse* http_head = nullptr;
+    WebKitFormBoundary_parse* webkit = NULL;
+    http_parse* http_head = NULL;
 
-    QFileInfo* file_info=nullptr;
+    QFileInfo* file_info=NULL;
 
-    QTimer *time;
+    QRcodeShow* codeShow=NULL;
+    QPoint mousePos;
 
     QString send_str = "";
-    int num = 0;
     Ui::MainWindow *ui;
 };
 #endif // MAINWINDOW_H

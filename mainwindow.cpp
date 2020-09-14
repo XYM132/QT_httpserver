@@ -11,12 +11,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     file_info = new QFileInfo();
 
-    time = new QTimer(this);
-    time->setSingleShot(true);
-    connect(time,SIGNAL(timeout()),this,SLOT(connect_timeout()));
-
     ui->pushButton_listen->click();
-
 }
 
 MainWindow::~MainWindow()
@@ -24,21 +19,9 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::readyread()
+void MainWindow::multi_readyread(MultiSocket* multi_socket)
 {
-
-    int index = -1;
-    for(int i=0;i<v_socket.size();i++)
-    {
-     if(v_socket[i]->state() == QAbstractSocket::ConnectedState)
-     {
-         if(v_socket[i]->bytesAvailable() > 0)
-             index = i;
-     }
-    }
-    if(index == -1) return;
-    QTcpSocket* tcp_socket = v_socket[index];
-
+    QTcpSocket* tcp_socket = multi_socket->_socket;
     while(tcp_socket->bytesAvailable() > 0)
     {
         QByteArray buf = tcp_socket->readAll();
@@ -81,13 +64,12 @@ void MainWindow::readyread()
             webkit = new WebKitFormBoundary_parse();
             part_data.clear();
 
-            disconnect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
-            connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(getFile()));
-            file_socket = index;
+            disconnect(multi_socket,SIGNAL(readyRead(MultiSocket*)),this,SLOT(multi_readyread(MultiSocket*)));
+            connect(multi_socket,SIGNAL(readyRead(MultiSocket*)),this,SLOT(getFile(MultiSocket*)));
 
             if(http_head->http_content.length() != 0)
             {
-                file_deal(http_head->http_content);
+                file_deal(multi_socket , http_head->http_content);
             }
             return;
         }
@@ -103,7 +85,7 @@ void MainWindow::readyread()
             }
             status = 302;
         }
-        else if(http_head->path == "/getFile/"+file_info->fileName())
+        else if(QByteArray::fromPercentEncoding(http_head->path.toUtf8()).data() == "/getFile/"+file_info->fileName())
         {
             QFile file(file_info->filePath());
             file.open(QIODevice::ReadOnly);
@@ -119,7 +101,6 @@ void MainWindow::readyread()
                 response = send_str.toUtf8();
                 send_str = "";
             }
-
             status = 200;
         }
         else if(http_head->path.indexOf("/js_css") == 0)
@@ -200,13 +181,16 @@ void MainWindow::readyread()
         tcp_socket->close();
 
 
-        v_socket.erase(v_socket.begin() + index);
+        delete multi_socket;
+        multi_socket = nullptr;
+        check_v_multi_socket();
     }
 }
 
-void MainWindow::file_deal(QByteArray buf)
+
+void MainWindow::file_deal(MultiSocket *multi_socket,QByteArray buf)
 {
-    QTcpSocket* tcp_socket = v_socket[file_socket];
+    QTcpSocket* tcp_socket = multi_socket->_socket;
     if(webkit->boundary == "")
     {
         webkit = new WebKitFormBoundary_parse(QString(buf));
@@ -259,44 +243,45 @@ void MainWindow::file_deal(QByteArray buf)
         tcp_socket->waitForBytesWritten(http.size() + response.size());
         tcp_socket->close();
 
-        v_socket.erase(v_socket.begin() + file_socket);
-        file_socket = -1;
+        delete multi_socket;
+        multi_socket = nullptr;
+        check_v_multi_socket();
 
-    }
-    else
-    {
-        time->start(2000);
     }
 }
 
-void MainWindow::getFile()
+void MainWindow::getFile(MultiSocket *multi_socket)
 {
-    time->stop();
+    //time->stop();
 
-    QTcpSocket* tcp_socket = v_socket[file_socket];
+    QTcpSocket* tcp_socket = multi_socket->_socket;
     while(tcp_socket->bytesAvailable() > 0)
     {
         QByteArray buf = tcp_socket->readAll();
-        file_deal(buf);
-
+        file_deal(multi_socket,buf);
     }
 }
+
+void MainWindow::check_v_multi_socket()
+{
+    for(int i = 0;i < v_multi_socket.size();i++)
+    {
+        if(v_multi_socket[i] == nullptr)
+            v_multi_socket.erase(v_multi_socket.begin() + i);
+    }
+}
+
 
 void MainWindow::new_connect()
 {
     while (tcp_sever->hasPendingConnections())
     {
         QTcpSocket* tcp_socket = tcp_sever->nextPendingConnection();
-        connect(tcp_socket,SIGNAL(readyRead()),this,SLOT(readyread()));
-        v_socket.push_back(tcp_socket);
-    }
-}
+        MultiSocket* t = new MultiSocket(tcp_socket,this);
 
-void MainWindow::connect_timeout()
-{
-    v_socket[file_socket]->close();
-    v_socket.erase(v_socket.begin() + file_socket);
-    file_socket = -1;
+        connect(t,SIGNAL(readyRead(MultiSocket*)),this,SLOT(multi_readyread(MultiSocket*)));
+        v_multi_socket.append(t);
+    }
 }
 
 
@@ -335,11 +320,14 @@ void MainWindow::on_pushButton_listen_clicked()
 
 
             QList<QHostAddress> list =QNetworkInterface::allAddresses();
+
             foreach (QHostAddress address, list)
             {
                if(address.protocol() ==QAbstractSocket::IPv4Protocol)
-                   //我们使用IPv4地址
-                   append_data_show(ui->textBrowser_info,address.toString(),"#0d4");
+               {
+                    ui->listWidget_ip->addItem(address.toString());
+
+               }
             }
             ui->pushButton_listen->setText("停止监听");
         }
@@ -363,8 +351,6 @@ void MainWindow::append_data_show(QTextBrowser* tb, QString text,QString color,Q
     tb->append(QString("<font color='%1'>[%2] %3</font>%4").arg(color).arg(time).arg(text).arg(end));
 }
 
-
-
 void MainWindow::on_pushButton_clear_clicked()
 {
     ui->textEdit_send->clear();
@@ -383,4 +369,24 @@ void MainWindow::on_pushButton_dir_html_clicked()
                 "./");
     if(dir_name.size() != 0)
         ui->lineEdit_dir_html->setText(dir_name);
+}
+
+void MainWindow::on_listWidget_ip_itemPressed(QListWidgetItem *item)
+{
+    qDebug() << item->text();
+    if(codeShow != NULL) codeShow->close();
+    codeShow = new QRcodeShow((char*)QString("http://" + item->text() +":" + QString("%1").arg(ui->spinBox_port->value())).toStdString().data());
+    codeShow->move(mousePos);
+    qDebug() << mousePos;
+    codeShow->show();
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *p)
+{
+    mousePos = p->pos();
+    if(codeShow != NULL)
+    {
+        codeShow->close();
+        codeShow=NULL;
+    }
 }
