@@ -1,30 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/css/zui.min.css">
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/lib/uploader/zui.uploader.min.css" rel="stylesheet">
-    
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/css/zui.min.css">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/lib/uploader/zui.uploader.min.css"
+    rel="stylesheet">
+
 </head>
+
 <body>
-    <textarea class="form-control" rows="3" placeholder="可以输入多行文本"></textarea>
-    <button class="btn btn-primary" type="button" onclick="btn_click()">发送</button>
-    <button class="btn" type="button" onclick="download_click()">下载</button>
-    <div id='uploaderExample' class="uploader" data-ride="uploader" id="myUploader" data-url="your/file/upload/url">
-        <div class="uploader-message text-center">
-          <div class="content"></div>
-          <button type="button" class="close">×</button>
-        </div>
-        <div class="uploader-files file-list file-list-lg" data-drag-placeholder="请拖拽文件到此处"></div>
-        <div class="uploader-actions">
-          <div class="uploader-status pull-right text-muted"></div>
-          <button type="button" class="btn btn-link uploader-btn-browse"><i class="icon icon-plus"></i> 选择文件</button>
-          <button type="button" class="btn btn-link uploader-btn-start"><i class="icon icon-cloud-upload"></i> 开始上传</button>
-        </div>
-      </div>
-      <div class="alert alert-success-inverse" id = "message" hidden = "hidden">...</div>
+  <textarea class="form-control" rows="3" placeholder="可以输入多行文本"></textarea>
+  <button class="btn btn-primary" type="button" onclick="btn_click()">发送</button>
+  <button class="btn" type="button" onclick="download_click()">下载</button>
+  <div id='uploaderExample' class="uploader" data-ride="uploader" id="myUploader" data-url="your/file/upload/url">
+    <div class="uploader-message text-center">
+      <div class="content"></div>
+      <button type="button" class="close">×</button>
+    </div>
+    <div class="uploader-files file-list file-list-lg" data-drag-placeholder="请拖拽文件到此处"></div>
+    <div class="uploader-actions">
+      <div class="uploader-status pull-right text-muted"></div>
+      <button type="button" class="btn btn-link uploader-btn-browse"><i class="icon icon-plus"></i> 选择文件</button>
+      <button type="button" class="btn btn-link uploader-btn-start"><i class="icon icon-cloud-upload"></i> 开始上传</button>
+    </div>
+  </div>
+  <!-- <div class="alert alert-success-inverse" id = "message" hidden = "hidden">...</div> -->
 </body>
 <script src="http://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script>
 <!-- ZUI Javascript 依赖 jQuery -->
@@ -33,43 +36,40 @@
 <script src="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/js/zui.min.js"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/zui/1.9.1/lib/uploader/zui.uploader.min.js"></script>
 <script>
-    var options = {
+  var options = {
     // 初始化选项
-        "chunk_size":1,
-    };
-    $('#myUploader').uploader(options);
-    function btn_click()
-    {
-        text = $('textarea').val();
-        console.log(text);
-        $.ajax({url:"/data",type:"POST",data:text});
-    }
+    "chunk_size": 1,
+  };
+  $('#myUploader').uploader(options);
+  function btn_click() {
+    text = $('textarea').val();
+    console.log(text);
+    $.ajax({ url: "/data", type: "POST", data: text });
+  }
 
-    function download_click()
-    {
-      window.location.href = "/getFile"
-    }
+  function download_click() {
+    window.location.href = "/getFile"
+  }
 
-    function get_data()
-    {
-      $.ajax({
-          url: "/sendData",
-          type : "POST",
-          data:{}, 
-          dataType:"text",
-          success: function(ajaxData) {
-                if(ajaxData != "")
-                {
-                  $("#message").html(ajaxData);
-                  $("#message").show();
-                }
-           }
-      });
-    }
-    setInterval(get_data,2000);
+  function get_data() {
+    $.ajax({
+      url: "/sendData",
+      type: "POST",
+      data: {},
+      dataType: "text",
+      success: function (ajaxData) {
+        if (ajaxData != "") {
+          $("#uploaderExample").after('<div class="alert alert-success-inverse" id = "message">'+ajaxData+'</div>');
+          // $("#message").show();
+        }
+      }
+    });
+  }
+  setInterval(get_data, 2000);
 
-    $('#uploaderExample').uploader({
+  $('#uploaderExample').uploader({
     url: '/file'  // 文件上传提交地址
-});
+  });
 </script>
+
 </html>

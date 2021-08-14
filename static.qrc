@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/statics">
+        <file>html/zui.uploader.min.js</file>
+        <file>html/zui.uploader.min.css</file>
+        <file>html/zui.min.js</file>
+        <file>html/zui.min.css</file>
+        <file>html/zenicon.woff</file>
+        <file>html/jquery.min.js</file>
+        <file>html/jquery.js</file>
+        <file>html/index.html</file>
+    </qresource>
+</RCC>

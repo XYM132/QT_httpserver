@@ -54,7 +54,7 @@ private slots:
 
     void on_pushButton_send_clicked();
 
-    void on_pushButton_dir_html_clicked();
+//    void on_pushButton_dir_html_clicked();
 
     void on_listWidget_ip_itemPressed(QListWidgetItem *item);
 

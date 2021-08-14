@@ -34,14 +34,15 @@ void MainWindow::multi_readyread(MultiSocket* multi_socket)
 
         if(http_head->path == "/")
         {
-            QString path = ui->lineEdit_dir_html->text();
-            QFileInfo htmlPath;
-            if(path.indexOf(".") == 0)
-                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
-            else
-                htmlPath = QFileInfo(path);
+//            QString path = ui->lineEdit_dir_html->text();
+//            QFileInfo htmlPath;
+//            if(path.indexOf(".") == 0)
+//                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
+//            else
+//                htmlPath = QFileInfo(path);
 
-            QFile html(htmlPath.absoluteFilePath() + "/index.html");
+//            QFile html(htmlPath.absoluteFilePath() + "/index.html");
+            QFile html(":/statics/html/index.html");
             if(html.open(QIODevice::ReadOnly))
             {
                 response = html.readAll();
@@ -50,7 +51,7 @@ void MainWindow::multi_readyread(MultiSocket* multi_socket)
                 status = 200;
             }
             else {
-                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + "/index.html" + "文件，请在源文件路径中选择正确的路径","#f00");
+                append_data_show(ui->textBrowser_info,"无法打开 /index.html 文件，请在源文件路径中选择正确的路径","#f00");
                 status = 404;
             }
         }
@@ -105,14 +106,14 @@ void MainWindow::multi_readyread(MultiSocket* multi_socket)
         }
         else if(http_head->path.indexOf("/js_css") == 0)
         {
-            QString path = ui->lineEdit_dir_html->text();
-            QFileInfo htmlPath;
-            if(path.indexOf(".") == 0)
-                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
-            else
-                htmlPath = QFileInfo(path);
+//            QString path = ui->lineEdit_dir_html->text();
+//            QFileInfo htmlPath;
+//            if(path.indexOf(".") == 0)
+//                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
+//            else
+//                htmlPath = QFileInfo(path);
 
-            QFile html(htmlPath.absoluteFilePath() + http_head->path.mid(7));
+            QFile html(":/statics/html/" + http_head->path.mid(7));
             if(http_head->path.mid(7).indexOf("js") != -1)
                 Content_Type = "application/javascript; charset=utf-8";
             else if(http_head->path.mid(7).indexOf("css") != -1)
@@ -125,21 +126,15 @@ void MainWindow::multi_readyread(MultiSocket* multi_socket)
                 status = 200;
             }
             else {
-                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
+                append_data_show(ui->textBrowser_info,"无法打开"+ http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
                 status = 404;
             }
         }
         else if(http_head->path == "/fonts/zenicon.woff?v=2.2.0")
         {
             Content_Type = "application/octet-stream";
-            QString path = ui->lineEdit_dir_html->text();
-            QFileInfo htmlPath;
-            if(path.indexOf(".") == 0)
-                htmlPath = QFileInfo(QDir::currentPath() +"/"+path);
-            else
-                htmlPath = QFileInfo(path);
 
-            QFile html(htmlPath.absoluteFilePath() + "/zenicon.woff");
+            QFile html(":/statics/html/zenicon.woff");
 
             if(html.open(QIODevice::ReadOnly))
             {
@@ -149,7 +144,7 @@ void MainWindow::multi_readyread(MultiSocket* multi_socket)
                 status = 200;
             }
             else {
-                append_data_show(ui->textBrowser_info,"无法打开" + htmlPath.absoluteFilePath() + http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
+                append_data_show(ui->textBrowser_info,"无法打开" + http_head->path.mid(7) + "文件，请在源文件路径中选择正确的路径","#f00");
                 status = 404;
             }
 
@@ -361,15 +356,6 @@ void MainWindow::on_pushButton_send_clicked()
     send_str = ui->textEdit_send->toPlainText();
 }
 
-void MainWindow::on_pushButton_dir_html_clicked()
-{
-    QString dir_name = QFileDialog::getExistingDirectory(
-                this,
-                tr("Open Directory"),
-                "./");
-    if(dir_name.size() != 0)
-        ui->lineEdit_dir_html->setText(dir_name);
-}
 
 void MainWindow::on_listWidget_ip_itemPressed(QListWidgetItem *item)
 {
